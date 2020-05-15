@@ -19,8 +19,7 @@ for line in lines:
 f.close()
 
 TOKEN = settings["TOKEN"]
-GUILD = None
-CHANNEL = None
+gl = {}
 client = discord.Client()
 
 frames = []
@@ -32,26 +31,53 @@ async def on_ready():
     print(f'{client.user} has connected to Discord!')
     
     for guild in client.guilds:
-        global GUILD
-        GUILD = guild
+        gl["GUILD"] = guild
         members = '\n - '.join([member.name for member in guild.members])
         print(f'Guild Members:\n - {members}')
         break
     
     for channel in guild.channels:
-        if channel.name == "bot-test":
-            global CHANNEL
-            CHANNEL = channel
+        if channel.name == "bot-test":           
+            gl["CHANNEL"] = channel
+        if channel.name == "roles-request":            
+            gl["ROLECHANNEL"] = channel
 
-    async for message in channel.history(limit=100):
+    for r in gl["GUILD"].roles:
+        if r.name=="PVPBeta":
+            gl["PVPROLE"]=r
+            break
+
+    async for message in gl["CHANNEL"].history(limit=100):
         await message.delete()
 
     await SendOutputs()
 
 @client.event
+async def on_raw_reaction_add(payload):
+    print("reaction: "+ str(payload.emoji))
+    if gl["GUILD"].get_channel(payload.channel_id) == gl["ROLECHANNEL"] and str(payload.emoji) == "🤖":
+        member = gl["GUILD"].get_member(payload.user_id)
+        curroles = member.roles
+        if gl["PVPROLE"] not in curroles:
+            curroles.append(gl["PVPROLE"])
+            await member.edit(roles=curroles)
+            print("Added role")
+
+@client.event
+async def on_raw_reaction_remove(payload):
+    print("reaction: "+ str(payload.emoji))
+    if gl["GUILD"].get_channel(payload.channel_id) == gl["ROLECHANNEL"] and str(payload.emoji) == "🤖":
+        member = gl["GUILD"].get_member(payload.user_id)
+        curroles = member.roles
+        if gl["PVPROLE"] in curroles:
+            curroles.remove(gl["PVPROLE"])
+            await member.edit(roles=curroles)
+            print("Removed role")
+    
+@client.event
 async def on_message(message):
     print(message.author.name + ": " + message.content)
-    if message.channel == CHANNEL and message.author != client.user:
+    if message.channel == gl["CHANNEL"] and message.author != client.user:
         for at in message.attachments:
             if at.height<=512 and at.width<=512 and at.size<1000000:
                 saveto = io.BytesIO()
@@ -59,14 +85,14 @@ async def on_message(message):
                 PVP.inputstext.append(message.content)
                 PVP.inputs.append(saveto)
                 await message.delete()
-                await SendOutputs()
+                async with gl["CHANNEL"].typing():
+                    await SendOutputs()
                 break
     elif message.author == client.user:
         oldmsg.append(message)
 
 async def SendOutputs():
     await DeleteOld()
-    await CHANNEL.send("Processing, please wait...")
     print("waiting outputs")
     await PVP.WaitForOutput()
 
@@ -75,8 +101,7 @@ async def SendOutputs():
             im = Image.fromarray(cv2.resize(AddBG(o)[:,:,:3],(820,256),fx=0,fy=0,interpolation=cv2.INTER_NEAREST))      
             im.save("a.png", "PNG") #sending from buffer not working?
             sendfile = discord.File("a.png", "state.png")
-            await DeleteOld()
-            await CHANNEL.send("Attach an image:", file=sendfile)
+            await gl["CHANNEL"].send("Attach an image:", file=sendfile)
     else:
         out = cv2.VideoWriter('result.mp4',cv2.VideoWriter_fourcc(*"H264"), 60, (820,256))
         for i in range(len(PVP.outputs)-2):
@@ -84,15 +109,14 @@ async def SendOutputs():
             out.write(cv2.resize(AddBG(o)[:,:,[2, 1, 0]],(820,256),fx=0,fy=0,interpolation=cv2.INTER_NEAREST))
         out.release()
         
-        await DeleteOld()
-        await CHANNEL.send("Result of the battle:", file=discord.File("result.mp4", "result.mp4"))
+        await gl["CHANNEL"].send("Result of the battle:", file=discord.File("result.mp4", "result.mp4"))
         
         o = PVP.outputs[-1]
         im = Image.fromarray(cv2.resize(AddBG(o)[:,:,:3],(820,256),fx=0,fy=0,interpolation=cv2.INTER_NEAREST))      
         im.save("a.png", "PNG") #sending from buffer not working?
         sendfile = discord.File("a.png", "state.png")
 
-        await CHANNEL.send("Attach an image:", file=sendfile)
+        await gl["CHANNEL"].send("Attach an image:", file=sendfile)
         
     PVP.outputs = []
     print("got outputs")
