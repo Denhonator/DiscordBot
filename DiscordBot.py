@@ -81,9 +81,14 @@ async def on_message(message):
         for at in message.attachments:
             if at.height<=512 and at.width<=512 and at.size<1000000:
                 saveto = io.BytesIO()
+                saveto2 = io.BytesIO()
+                await message.author.avatar_url_as(format="png", size=256).save(saveto2)
                 await at.save(saveto)
-                PVP.inputstext.append(message.content)
+                PVP.inputstext.append(message.content+(" hide" if at.is_spoiler() else ""))
+                PVP.inputstext.append(message.content+(" hide" if at.is_spoiler() else ""))
+                PVP.inputs.append(saveto2)
                 PVP.inputs.append(saveto)
+
                 await message.delete()
                 async with gl["CHANNEL"].typing():
                     await SendOutputs()
