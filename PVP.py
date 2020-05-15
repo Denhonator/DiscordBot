@@ -16,6 +16,7 @@ gl = {"state":      0,
       "turn":       0}
 
 inputs = []
+inputstext = []
 outputs = []
 
 battleimg = np.zeros((32,205,4), dtype=np.uint8)
@@ -34,8 +35,8 @@ async def WaitForOutput():
         await asyncio.sleep(0.1)
     return
 
-def PlayImage(update=True):
-    flip = True if gl["state"]==2 or gl["state"]==4 else False
+def PlayImage(update=True, flip=False):
+    #flip = True if gl["state"]==2 or gl["state"]==4 else False
     img = gl["lastImg"]
     for x in range(32):
         for y in range(32):
@@ -93,8 +94,10 @@ def SwitchState(st):
         gl["state"] += 1
     
     elif gl["state"] == 5:
-        gl["state"] = 3
+        gl["state"] = 1
+        A[1] = np.zeros((32,32,4), dtype=np.uint8)
         A[3] = np.zeros((32,32,4), dtype=np.uint8)
+        P[3] = np.zeros((32,32,4), dtype=np.uint8)
     
     if gl["state"] != 5:
         gl["lastImg"] = imgs["selection"]
@@ -114,6 +117,7 @@ def Battle():
 class GameThread(threading.Thread):
     def run(self):
         global inputs
+        global inputstext
 
         test = Image.open("bg.png").convert("RGBA")
         testdata = np.asarray(test, dtype=np.uint8)
@@ -129,11 +133,12 @@ class GameThread(threading.Thread):
         while True:
             time.sleep(0.1)
             if gl["state"] != 5:
-                for i in inputs:
-                    gl["lastImg"] = cv2.resize(np.asarray(Image.open(i).convert("RGBA")),(32,32),fx=0,fy=0,interpolation=cv2.INTER_NEAREST)
-                    PlayImage(False)
+                for j in range(len(inputs)):
+                    gl["lastImg"] = cv2.resize(np.asarray(Image.open(inputs[j]).convert("RGBA")),(32,32),fx=0,fy=0,interpolation=cv2.INTER_NEAREST)
+                    PlayImage(False, "flip" in inputstext[j].lower())
                     SwitchState(gl["state"])
                 inputs = []
+                inputstext = []
             else:
                 Battle()
 

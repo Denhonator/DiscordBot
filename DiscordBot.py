@@ -56,6 +56,7 @@ async def on_message(message):
             if at.height<=512 and at.width<=512 and at.size<1000000:
                 saveto = io.BytesIO()
                 await at.save(saveto)
+                PVP.inputstext.append(message.content)
                 PVP.inputs.append(saveto)
                 await message.delete()
                 await SendOutputs()
@@ -64,10 +65,7 @@ async def on_message(message):
         oldmsg.append(message)
 
 async def SendOutputs():
-    global oldmsg
-    for m in oldmsg:
-        await m.delete()
-    oldmsg = []
+    await DeleteOld()
     await CHANNEL.send("Processing, please wait...")
     print("waiting outputs")
     await PVP.WaitForOutput()
@@ -77,23 +75,33 @@ async def SendOutputs():
             im = Image.fromarray(cv2.resize(AddBG(o)[:,:,:3],(820,256),fx=0,fy=0,interpolation=cv2.INTER_NEAREST))      
             im.save("a.png", "PNG") #sending from buffer not working?
             sendfile = discord.File("a.png", "state.png")
-            await CHANNEL.send("", file=sendfile)
+            await DeleteOld()
+            await CHANNEL.send("Attach an image:", file=sendfile)
     else:
         out = cv2.VideoWriter('result.mp4',cv2.VideoWriter_fourcc(*"H264"), 60, (820,256))
         for i in range(len(PVP.outputs)-2):
             o = PVP.outputs[i]
             out.write(cv2.resize(AddBG(o)[:,:,[2, 1, 0]],(820,256),fx=0,fy=0,interpolation=cv2.INTER_NEAREST))
         out.release()
-        await CHANNEL.send("", file=discord.File("result.mp4", "result.mp4"))
+        
+        await DeleteOld()
+        await CHANNEL.send("Result of the battle:", file=discord.File("result.mp4", "result.mp4"))
         
         o = PVP.outputs[-1]
         im = Image.fromarray(cv2.resize(AddBG(o)[:,:,:3],(820,256),fx=0,fy=0,interpolation=cv2.INTER_NEAREST))      
         im.save("a.png", "PNG") #sending from buffer not working?
         sendfile = discord.File("a.png", "state.png")
-        await CHANNEL.send("", file=sendfile)
+
+        await CHANNEL.send("Attach an image:", file=sendfile)
         
     PVP.outputs = []
     print("got outputs")
+
+async def DeleteOld():
+    global oldmsg
+    for m in oldmsg:
+        await m.delete()
+    oldmsg = []
 
 def AddBG(s_img):
     l_img = PVP.imgs["bg"].copy()
