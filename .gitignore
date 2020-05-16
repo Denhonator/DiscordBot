@@ -126,3 +126,4 @@ dmypy.json
 *.png
 *.mp4
 settings.txt
+stats.txt

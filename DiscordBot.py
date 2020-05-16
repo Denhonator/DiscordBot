@@ -8,6 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import PVP
 from PIL import Image
+import json
 
 settings = {}
 f = open("settings.txt", "r")
@@ -41,6 +42,8 @@ async def on_ready():
             gl["CHANNEL"] = channel
         if channel.name == "roles-request":            
             gl["ROLECHANNEL"] = channel
+        if channel.name == "leaderboards":
+            gl["LEADERBOARDS"] = channel
 
     for r in gl["GUILD"].roles:
         if r.name=="PVPBeta":
@@ -84,6 +87,7 @@ async def on_message(message):
                 saveto2 = io.BytesIO()
                 await message.author.avatar_url_as(format="png", size=256).save(saveto2)
                 await at.save(saveto)
+                PVP.pnames.append(message.author.name)
                 PVP.inputstext.append(message.content+(" hide" if at.is_spoiler() else ""))
                 PVP.inputstext.append(message.content+(" hide" if at.is_spoiler() else ""))
                 PVP.inputs.append(saveto2)
@@ -122,6 +126,13 @@ async def SendOutputs():
         sendfile = discord.File("a.png", "state.png")
 
         await gl["CHANNEL"].send("Attach an image:", file=sendfile)
+
+        edited = False
+        async for message in gl["LEADERBOARDS"].history(limit=1):
+            await message.edit(content=json.dumps(PVP.stats,sort_keys=True, indent=4))
+            edited = True
+        if not edited:
+            await gl["LEADERBOARDS"].send(content=json.dumps(PVP.stats,sort_keys=True, indent=4))
         
     PVP.outputs = []
     print("got outputs")
